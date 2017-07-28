@@ -64,7 +64,6 @@ func finalizer(a *OrmAdapter) {
 
 // NewAdapter is the constructor for Adapter.
 func NewAdapter() *OrmAdapter {
-	//TODO Inital the driver and source from profile
 	a := &OrmAdapter{}
 	a.driverName = rcConfigure.Drivername
 	a.dataSourceName = rcConfigure.DataSourceName
@@ -112,18 +111,13 @@ func (a *OrmAdapter) SyncTable() {
 }
 
 // The query rule shall be username + resouce，find more record
-//TODO add the validation from route level
 func (a *OrmAdapter) findUserPermission(lines *[]Line, line *Line) error {
-	//result := make([]Line, 0)
-
-	//return a.engine.Find(&result, line)
 	err := a.engine.Find(lines, line)
 	fmt.Println("ORM find the result account :", len(*lines))
 	return err
 }
 
 // The query rule shall be username + resouce, get one record
-//TODO add the validation from route level
 func (a *OrmAdapter) getUserPermission(line *Line) (bool, error) {
 	return a.engine.Get(*line)
 }
@@ -150,28 +144,17 @@ func (a *OrmAdapter) updateUserPermission(line *Line) (int64, error) {
 }
 
 func (a *OrmAdapter) addUserPermission(line Line) (int64, error) {
-	//TODO, consider whether to use transaction
-	session := a.engine.NewSession()
-	defer session.Close()
-	err := session.Begin()
-	has, err := session.Get(&line)
+	has, err := a.engine.Get(&line)
 	if err != nil {
-		session.Rollback()
 		return -1, err
 	}
 	if has == true {
-		// TODO return new error
 		fmt.Println("Record already exist")
 		return -1, ErrNotExist
 	}
-	id, err := session.Insert(&line)
+	id, err := a.engine.Insert(&line)
 	if err != nil {
 		fmt.Println("ORM Insert Data fail")
-		session.Rollback()
-		return -1, err
-	}
-	err = session.Commit()
-	if err != nil {
 		return -1, err
 	}
 	return id, nil

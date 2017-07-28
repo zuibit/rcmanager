@@ -33,6 +33,7 @@ import (
 	"github.com/labstack/echo"
 )
 
+// TODO use data structure to include the return data
 type PermissionResponse struct {
 	Status  int    `json:"status"`
 	Message string `json:"message"`
@@ -88,7 +89,6 @@ func deletePermission(c echo.Context) error {
 	line := new(Line)
 	if err := c.Bind(line); err != nil {
 		res.setResBody(400, "Delete request Param error,  pls provide Username, Resource & Action", 0, err.Error(), nil)
-
 		return c.JSON(http.StatusOK, res)
 	}
 	fmt.Println("username: ", line.Username, "Resource: ", line.Resource, "Action: ", line.Action)
@@ -171,4 +171,5 @@ func addPermission(c echo.Context) error {
 func downloadFile(c echo.Context) error {
 	//just for test
 	return c.Attachment("1.txt", "2.txt")
+	//return c.File("1.txt")
 }

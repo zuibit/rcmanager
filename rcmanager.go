@@ -33,6 +33,7 @@ import (
 
 	"github.com/casbin/casbin"
 	"github.com/casbin/xorm-adapter"
+	"github.com/dgrijalva/jwt-go"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo"
@@ -103,25 +104,35 @@ func startRCServer() {
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))))
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	//TODO switch to https after enable
+	//e.Pre(middleware.HTTPSWWWRedirect())
 
 	//Reserve for auth validation
 	//TODO add auth verification for API
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			// TODO Suggest to use JWT token
 			// Extract the credentials from HTTP request header and perform a security check
 
 			// For invalid credentials
 			// return echo.NewHTTPError(http.StatusUnauthorized, "Please provide valid credentials")
 			// For valid credentials call next
 			// return next(c)
-			username, _, _ := c.Request().BasicAuth()
-			fmt.Println(c.Path() + " recorded" + ", user is " + username)
+			user := c.Get("user").(*jwt.Token)
+			claims := user.Claims.(jwt.MapClaims)
+			name := claims["name"].(string)
+			// name, _, _ = c.Request().BasicAuth()
+			fmt.Println(c.Path() + " recorded" + ", user is " + name)
 			return next(c)
 		}
 	})
 	e.Server.ReadTimeout = time.Duration(rcConfigure.ServerReadTimeout) * time.Second
 	e.Server.WriteTimeout = time.Duration(rcConfigure.ServerWriteTimeout) * time.Second
+	//TODO JWT security key
+	e.Use(middleware.JWT([]byte("secret")))
 	e.Logger.Fatal(e.Start(":1323"))
+	//TODO Enabling https shall register domain for the service
+	//e.Logger.Fatal(e.StartAutoTLS(":443"))
 }
 
 func main() {
