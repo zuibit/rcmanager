@@ -28,7 +28,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path"
+	"strconv"
+	"strings"
 
 	"github.com/labstack/echo"
 )
@@ -68,7 +73,7 @@ func getPermission(c echo.Context) error {
 	isinvalid := len(line.Username) == 0 && len(line.Resource) == 0 && len(line.Action) == 0 && len(line.PType) == 0
 	if isinvalid == false {
 		fmt.Println("query user :", line.Username)
-		err := ormAdapter.findUserPermission(&lines, line)
+		err := ormPermissionAdapter.findUserPermission(&lines, line)
 		if err == nil {
 			res.setResBody(200, "Find :"+line.Username, len(lines), "", lines)
 		} else {
@@ -126,7 +131,7 @@ func updatePermission(c echo.Context) error {
 
 	isinvalid := len(line.Username) == 0 || len(line.Resource) == 0 || len(line.Action) == 0 || len(line.PType) == 0
 	if isinvalid != true {
-		_, err := ormAdapter.updateUserPermission(line)
+		_, err := ormPermissionAdapter.updateUserPermission(line)
 		if err == nil {
 			res.setResBody(200, "Update successful :"+line.Username, 0, err.Error(), nil)
 		} else {
@@ -170,6 +175,66 @@ func addPermission(c echo.Context) error {
 
 func downloadFile(c echo.Context) error {
 	//just for test
+	//filename := c.QueryParam("name")
+	//TODO generate the file path, check whether file exist, then return the response
 	return c.Attachment("1.txt", "2.txt")
 	//return c.File("1.txt")
+}
+
+func upLoadThing(c echo.Context) error {
+	//TODO code review to solve the potential performance risk
+	res := &PermissionResponse{}
+
+	thing := c.FormValue("thing")
+	version, err := strconv.ParseFloat(c.FormValue("version"), 32)
+	if err != nil {
+		res.setResBody(400, "version shall be float such as 1.0 ", 0, ErrParamsType.Error(), nil)
+		return c.JSON(http.StatusOK, res)
+	}
+	if thing == "" {
+		res.setResBody(400, "please provide thing name", 0, ErrParamsType.Error(), nil)
+		return c.JSON(http.StatusOK, res)
+	}
+
+	// Source
+	file, err := c.FormFile("file")
+	fmt.Println("Upload file name is :", file.Filename, " Header is :", file.Header)
+
+	if err != nil {
+		res.setResBody(400, "Source file error", 0, err.Error(), nil)
+		return c.JSON(http.StatusOK, res)
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		res.setResBody(400, "Upload file open exception", 0, err.Error(), nil)
+		return c.JSON(http.StatusOK, res)
+	}
+	defer src.Close()
+	//TODO get the things name and add it to the file path, need to check whether the folder does already exist
+	dst, err := os.Create(rcConfigure.StaticFolder + "/" + file.Filename)
+	fmt.Println("dst's name is :", dst.Name())
+	if err != nil {
+		res.setResBody(500, "Server file create exception", 0, err.Error(), nil)
+		return c.JSON(http.StatusOK, res)
+	}
+	defer dst.Close()
+
+	// Copy
+	if _, err = io.Copy(dst, src); err != nil {
+		res.setResBody(500, "Server file copy exception", 0, err.Error(), nil)
+		return c.JSON(http.StatusOK, res)
+	}
+
+	if fileSuffix := path.Ext(file.Filename); strings.Contains(fileSuffix, "zip") || strings.Contains(fileSuffix, "tar") || strings.Contains(fileSuffix, ".gz") {
+		//TODO maybe some performance issue
+		//TODO use struct instead of the parameter
+		err = handleUploadThing(dst.Name(), fileSuffix, thing, float32(version))
+	}
+	if err != nil {
+		res.setResBody(500, "Server exception for upload file", 0, err.Error(), nil)
+	} else {
+		res.setResBody(200, "Server file create successfuly", 0, "", nil)
+	}
+	return c.JSON(http.StatusOK, res)
 }

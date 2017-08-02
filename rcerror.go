@@ -39,4 +39,8 @@ var (
 	ErrNeedDeletedCond = errors.New("Delete need at least one condition")
 	// ErrNotImplemented not implemented
 	ErrNotImplemented = errors.New("Not implemented")
+	// ErrFileTypeNotSupported extract file type
+	ErrFileTypeNotSupported = errors.New("Extract file type not support")
+	// ErrJSONFileNotFound not implemented
+	ErrJSONFileNotFound = errors.New(" Json file not found")
 )

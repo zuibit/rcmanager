@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+//TODO not use this orm ,since casbin already support it
+
 package main
 
 import (
@@ -50,21 +52,21 @@ type Lines struct {
 	Lines []Line `json:"result"`
 }
 
-type OrmAdapter struct {
+type OrmPermissionAdapter struct {
 	driverName     string
 	dataSourceName string
 	engine         *xorm.Engine
 }
 
 // finalizer is the destructor for Adapter.
-func finalizer(a *OrmAdapter) {
+func permissionfinalizer(a *OrmPermissionAdapter) {
 	a.engine.Close()
 	fmt.Println("Casbin ORM close")
 }
 
 // NewAdapter is the constructor for Adapter.
-func NewAdapter() *OrmAdapter {
-	a := &OrmAdapter{}
+func NewPermissionAdapter() *OrmPermissionAdapter {
+	a := &OrmPermissionAdapter{}
 	a.driverName = rcConfigure.Drivername
 	a.dataSourceName = rcConfigure.DataSourceName
 
@@ -72,12 +74,12 @@ func NewAdapter() *OrmAdapter {
 	a.open()
 
 	// Call the destructor when the object is released.
-	runtime.SetFinalizer(a, finalizer)
+	runtime.SetFinalizer(a, permissionfinalizer)
 	return a
 }
 
 // Open the orm engine
-func (a *OrmAdapter) open() {
+func (a *OrmPermissionAdapter) open() {
 	//Assume that DB is already exist , not need to create
 	var engine *xorm.Engine
 	var err error
@@ -102,7 +104,7 @@ func (a *OrmAdapter) open() {
 }
 
 // Sync the table structure
-func (a *OrmAdapter) SyncTable() {
+func (a *OrmPermissionAdapter) SyncTable() {
 	err := a.engine.Sync2(new(Line))
 	if err != nil {
 		panic(err)
@@ -111,24 +113,24 @@ func (a *OrmAdapter) SyncTable() {
 }
 
 // The query rule shall be username + resouce，find more record
-func (a *OrmAdapter) findUserPermission(lines *[]Line, line *Line) error {
+func (a *OrmPermissionAdapter) findUserPermission(lines *[]Line, line *Line) error {
 	err := a.engine.Find(lines, line)
 	fmt.Println("ORM find the result account :", len(*lines))
 	return err
 }
 
 // The query rule shall be username + resouce, get one record
-func (a *OrmAdapter) getUserPermission(line *Line) (bool, error) {
+func (a *OrmPermissionAdapter) getUserPermission(line *Line) (bool, error) {
 	return a.engine.Get(*line)
 }
 
-func (a *OrmAdapter) deleteUserPermission(line Line) (int64, error) {
+func (a *OrmPermissionAdapter) deleteUserPermission(line Line) (int64, error) {
 	return a.engine.Delete(line)
 }
 
 //TODO No need to update the permission, for one kind of resource , only provide add, delete and get
 //would remove it
-func (a *OrmAdapter) updateUserPermission(line *Line) (int64, error) {
+func (a *OrmPermissionAdapter) updateUserPermission(line *Line) (int64, error) {
 	mLine := &Line{}
 	has, err := a.engine.Where("username=?", mLine.Username).Get(mLine)
 
@@ -143,7 +145,7 @@ func (a *OrmAdapter) updateUserPermission(line *Line) (int64, error) {
 	}
 }
 
-func (a *OrmAdapter) addUserPermission(line Line) (int64, error) {
+func (a *OrmPermissionAdapter) addUserPermission(line Line) (int64, error) {
 	has, err := a.engine.Get(&line)
 	if err != nil {
 		return -1, err

@@ -41,6 +41,7 @@ type RcConfigure struct {
 	OrmMaxOpen         int    `ini:"ormmaxOpen"`
 	ServerReadTimeout  int    `ini:"serverReadTimeout"`
 	ServerWriteTimeout int    `ini:"serverWriteTimeout"`
+	StaticFolder       string `ini:"StaticFolder"`
 }
 
 var rcConfigure *RcConfigure
@@ -66,6 +67,7 @@ func initRCProfiling() {
 		OrmMaxOpen:         20,
 		ServerReadTimeout:  10,
 		ServerWriteTimeout: 10,
+		StaticFolder:       "static",
 	}
 	/*
 		rcConfigure.Drivername = cfg.Section("").Key("drivername").String()
@@ -86,5 +88,7 @@ func initRCProfiling() {
 		fmt.Println("OrmMaxOpen :", rcConfigure.OrmMaxOpen)
 		fmt.Println("ServerReadTimeout :", rcConfigure.ServerReadTimeout)
 		fmt.Println("ServerWriteTimeout :", rcConfigure.ServerWriteTimeout)
+		fmt.Println("Static folder is :", rcConfigure.StaticFolder)
+
 	}
 }

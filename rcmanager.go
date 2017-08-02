@@ -33,7 +33,7 @@ import (
 
 	"github.com/casbin/casbin"
 	"github.com/casbin/xorm-adapter"
-	"github.com/dgrijalva/jwt-go"
+	//	"github.com/dgrijalva/jwt-go"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo"
@@ -44,7 +44,8 @@ import (
 
 var rcEnforce *casbin.Enforcer
 
-var ormAdapter *OrmAdapter
+var ormPermissionAdapter *OrmPermissionAdapter
+var ormMetadataAdapter *OrmMetadataAdapter
 
 // just support mysql adaptor and file adaptor
 // init ORM, TODO move the create table implement into rcorm
@@ -75,19 +76,20 @@ func initCasbinRCEnforce() {
 }
 
 func initORM() {
-	ormAdapter = NewAdapter()
+	ormPermissionAdapter = NewPermissionAdapter()
+	ormMetadataAdapter = NewMetadataAdapter()
 }
 
 func startRCServer() {
 	e := echo.New()
 	e.Debug = true
 	//TODO add static profile
-	e.Static("/rc", "static")
+	e.Static("/rc", rcConfigure.StaticFolder)
 
 	//skin the user related function such as user/add ; user/delete
 	config := casbinmw.Config{
 		Skipper: func(c echo.Context) bool {
-			return strings.Contains(c.Path(), "/userpermission") || strings.Contains(c.Path(), "/file")
+			return strings.Contains(c.Path(), "/userpermission") || strings.Contains(c.Path(), "/thing")
 		},
 		Enforcer: rcEnforce,
 	}
@@ -98,7 +100,8 @@ func startRCServer() {
 	e.GET("/userpermission/get", getPermission)
 	e.POST("/userpermission/delete", deletePermission)
 	e.POST("/userpermission/add", addPermission)
-	e.GET("/file", downloadFile)
+	e.GET("/file/download", downloadFile)
+	e.POST("/thing/upload", upLoadThing)
 	//e.POST("/userpermission/update", updatePermission)
 
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))))
@@ -118,18 +121,17 @@ func startRCServer() {
 			// return echo.NewHTTPError(http.StatusUnauthorized, "Please provide valid credentials")
 			// For valid credentials call next
 			// return next(c)
-			user := c.Get("user").(*jwt.Token)
-			claims := user.Claims.(jwt.MapClaims)
-			name := claims["name"].(string)
-			// name, _, _ = c.Request().BasicAuth()
-			fmt.Println(c.Path() + " recorded" + ", user is " + name)
+			//user := c.Get("user").(*jwt.Token)
+			//claims := user.Claims.(jwt.MapClaims)
+			//name := claims["name"].(string)
+			// check whether user is valid
 			return next(c)
 		}
 	})
 	e.Server.ReadTimeout = time.Duration(rcConfigure.ServerReadTimeout) * time.Second
 	e.Server.WriteTimeout = time.Duration(rcConfigure.ServerWriteTimeout) * time.Second
 	//TODO JWT security key
-	e.Use(middleware.JWT([]byte("secret")))
+	//e.Use(middleware.JWT([]byte("secret")))
 	e.Logger.Fatal(e.Start(":1323"))
 	//TODO Enabling https shall register domain for the service
 	//e.Logger.Fatal(e.StartAutoTLS(":443"))
@@ -139,5 +141,6 @@ func main() {
 	initRCProfiling()
 	initCasbinRCEnforce()
 	initORM()
+
 	startRCServer()
 }
