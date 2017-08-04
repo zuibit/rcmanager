@@ -24,10 +24,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+//TODO move this file to thing api
+
 package main
 
 import (
-	"fmt"
 	io "io/ioutil"
 	"strings"
 
@@ -35,12 +36,12 @@ import (
 	"os"
 	"path/filepath"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/mholt/archiver"
 )
 
-//file path to store things
-//TODO set it from profile
-var thingsOuputFolder = "things/"
+var tempExtractFolder = "thingstmp"
 
 type ThingsMetadata struct {
 }
@@ -50,11 +51,13 @@ func NewThingsMetadata() *ThingsMetadata {
 }
 
 func (self *ThingsMetadata) load(filename string, v interface{}) error {
-
 	data, err := io.ReadFile(filename)
 
 	if err != nil {
-		fmt.Println("Read Json file error :", err)
+		rcLog.WithFields(log.Fields{
+			"Thing Metadata File": filename,
+			"Error":               err,
+		}).Error("Read Json file error")
 		return err
 	}
 
@@ -62,19 +65,19 @@ func (self *ThingsMetadata) load(filename string, v interface{}) error {
 	err = json.Unmarshal(datajson, v)
 
 	if err != nil {
-		fmt.Println("Unmarshal Json file error :", err)
 		return err
 	}
 	return nil
 }
 
 // return the file path if no error
-func (self *ThingsMetadata) getJsonFilePath(filename string) string {
+func (self *ThingsMetadata) getJsonFilePath(filename string) (string, error) {
 	jsonFile := ""
 	err := filepath.Walk(filename, func(path string, f os.FileInfo, err error) error {
-		//TODO assume that the ".json" file store in the root path of the thing file, depth check to avoid the performance issue
+		//TODO assume that the ".json" file store in the root path of the thing file
+		//depth check to avoid the performance issue
 		depth := strings.Count(path, "/") - strings.Count(filename, "/")
-		if depth > 4 {
+		if depth > 3 {
 			return filepath.SkipDir
 		}
 
@@ -87,26 +90,40 @@ func (self *ThingsMetadata) getJsonFilePath(filename string) string {
 		//TODO define the file format and use const to replace the hard code
 		//shall be only one .json file
 		if strings.Contains(path, ".json") {
-			fmt.Println("Json file path is ", path)
+			rcLog.WithFields(log.Fields{
+				"Thing Metadata File": path,
+				"Archive Package":     filename,
+			}).Info("Found Metadata File in compress package")
 			jsonFile = path
 		}
-
 		return nil
 	})
 	if err != nil {
-		fmt.Printf("filepath.Walk() returned %v\n", err)
+		rcLog.WithFields(log.Fields{
+			"Archive Package": filename,
+			"Error is ":       err,
+		}).Info("Not Found Metadata File in compress package")
 	}
-	return jsonFile
+	return jsonFile, err
 }
 
 //support .ZIP, .TAR or .tar.gz
-func handleUploadThing(filename string, ext string, outputfolder string, version float32) error {
-	fmt.Println("Handle archive file: ", filename, " ext is :", ext)
+func handleUploadThing(filename string, ext string, outputfolder string, version float32) (*Metadata, error) {
+
+	rcLog.WithFields(log.Fields{
+		"Archive Package": filename,
+		"Ext ":            ext,
+	}).Info("Handle archive package")
+
 	thingsMetadata := NewThingsMetadata()
 	metaData := Metadata{}
 
 	var err error
-	var desFilePath = rcConfigure.StaticFolder + outputfolder
+	//extract folder such as static/speaker/test
+	desFilePath, err := io.TempDir(rcConfigure.StaticFolder, outputfolder)
+	if err != nil {
+		return nil, err
+	}
 	switch ext {
 	case ".zip":
 		err = archiver.Zip.Open(filename, desFilePath)
@@ -121,24 +138,30 @@ func handleUploadThing(filename string, ext string, outputfolder string, version
 		err = ErrFileTypeNotSupported
 	}
 	if nil != err {
-		fmt.Println("Extract file error : ", err)
-		return err
+		rcLog.WithFields(log.Fields{
+			"Archive Package": filename,
+			"Error ":          err,
+		}).Error("Could not extract archive package")
+
+		return nil, err
 	}
-	jsonFile := thingsMetadata.getJsonFilePath(desFilePath)
-	fmt.Println("Get Json file :", jsonFile)
+	jsonFile, err := thingsMetadata.getJsonFilePath(desFilePath)
+
+	if err != nil {
+		return nil, err
+	}
 	if jsonFile == "" {
-		return ErrJSONFileNotFound
+		return nil, ErrJSONFileNotFound
 	}
 	if err = thingsMetadata.load(jsonFile, &metaData); err != nil {
-		fmt.Println("Load Data error :", err)
-		return err
+		return nil, err
 	}
-	//TODO need to confirm that each thing only have one property
-	metaData.ClassID = metaData.Properties[0].ClassId
+	//Each version thing only have one ClassId
+	metaData.ClassId = metaData.Properties[0].ClassId
 	metaData.FilePath = filename
-	metaData.Version = version
-
-	ormMetadataAdapter.addthing(metaData)
+	metaData.Verson = version
+	_, err = ormMetadataAdapter.addthing(metaData)
+	os.RemoveAll(desFilePath)
 	/*
 		fmt.Println("Load data :", metaData)
 		fmt.Println("Package Name is ", metaData.PackageName)
@@ -151,26 +174,5 @@ func handleUploadThing(filename string, ext string, outputfolder string, version
 		fmt.Println("Vender is ", metaData.Properties[0].Vendor)
 		fmt.Println("DependClass is ", metaData.Properties[0].DependClass)
 	*/
-	return err
-}
-
-//just for test
-func testLoadJsonSetting() {
-	thingsMetadata := NewThingsMetadata()
-	metaData := Metadata{}
-	if err := thingsMetadata.load("static/metadata.json", &metaData); err != nil {
-		fmt.Println("Load Data error :", err)
-		return
-	}
-	fmt.Println("Load data :", metaData)
-	fmt.Println("Package Name is ", metaData.PackageName)
-	fmt.Println("Class Name is ", metaData.Properties[0].ClassName)
-	fmt.Println("Class ID is ", metaData.Properties[0].ClassId)
-	fmt.Println("Description is ", metaData.Properties[0].Description)
-	fmt.Println("Name is ", metaData.Properties[0].Name)
-	fmt.Println("Release Time is ", metaData.Properties[0].ReleaseTime)
-	fmt.Println("Release Time is ", metaData.Properties[0].TargetPlatform)
-	fmt.Println("Vender is ", metaData.Properties[0].Vendor)
-	fmt.Println("DependClass is ", metaData.Properties[0].DependClass)
-
+	return &metaData, err
 }

@@ -28,6 +28,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -40,12 +41,52 @@ import (
 	casbinmw "github.com/labstack/echo-contrib/casbinmw"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/middleware"
+	log "github.com/sirupsen/logrus"
 )
 
 var rcEnforce *casbin.Enforcer
 
 var ormPermissionAdapter *OrmPermissionAdapter
 var ormMetadataAdapter *OrmMetadataAdapter
+var rcLog = log.New()
+
+func initLog() {
+	// Log as JSON instead of the default ASCII formatter.
+	rcLog.Formatter = &log.JSONFormatter{}
+
+	if rcConfigure.LogFile != "" {
+		timestamp := time.Now().Format("2006-01-02-15-04-05-")
+
+		file, err := os.OpenFile(timestamp+rcConfigure.LogFile, os.O_CREATE|os.O_WRONLY, 0666)
+		if err == nil {
+			rcLog.Out = file
+		} else {
+			rcLog.Out = os.Stdout
+		}
+	}
+
+	// Log leve is debug, info, warn, error, fatal, panic
+	// TODO read the level from profile
+	switch rcConfigure.LogLevel {
+	case 0:
+		rcLog.SetLevel(log.DebugLevel)
+	case 1:
+		rcLog.SetLevel(log.InfoLevel)
+	case 2:
+		rcLog.SetLevel(log.WarnLevel)
+	case 3:
+		rcLog.SetLevel(log.ErrorLevel)
+	case 4:
+		rcLog.SetLevel(log.FatalLevel)
+	case 5:
+		rcLog.SetLevel(log.PanicLevel)
+	default:
+		rcLog.SetLevel(log.ErrorLevel)
+	}
+	fmt.Println("Set Log level: ", log.GetLevel())
+
+	//TODO add the hook to collect log in Mongo, Redis or other...
+}
 
 // just support mysql adaptor and file adaptor
 // init ORM, TODO move the create table implement into rcorm
@@ -60,7 +101,10 @@ func initCasbinRCEnforce() {
 		//TODO maybe it would be some performance issue if import big data, need to check later
 		err := dbAdapter.SavePolicy(e.GetModel())
 		if err != nil {
-			fmt.Println("Policy import from csv file failed")
+			rcLog.WithFields(log.Fields{
+				"Import Policay": rcConfigure.AuthImportPolicy,
+			}).Panic("Policy import from csv file failed")
+
 			panic(err)
 		}
 		e.ClearPolicy()
@@ -68,11 +112,11 @@ func initCasbinRCEnforce() {
 	rcEnforce = casbin.NewEnforcer(rcConfigure.AuthMode, dbAdapter)
 	if rcEnforce == nil {
 		//TODO add log management later
-		fmt.Println("init rc fail")
+		rcLog.Error("Init casbin Enforcer failed")
 		return
 	}
 	rcEnforce.LoadPolicy()
-	fmt.Println("Loading Policy successfully")
+	rcLog.Info("Loading Policy successfully")
 }
 
 func initORM() {
@@ -83,10 +127,9 @@ func initORM() {
 func startRCServer() {
 	e := echo.New()
 	e.Debug = true
-	//TODO add static profile
 	e.Static("/rc", rcConfigure.StaticFolder)
 
-	//skin the user related function such as user/add ; user/delete
+	//skip the open API related function such as userpermission/add ; userpermission/delete
 	config := casbinmw.Config{
 		Skipper: func(c echo.Context) bool {
 			return strings.Contains(c.Path(), "/userpermission") || strings.Contains(c.Path(), "/thing")
@@ -100,8 +143,10 @@ func startRCServer() {
 	e.GET("/userpermission/get", getPermission)
 	e.POST("/userpermission/delete", deletePermission)
 	e.POST("/userpermission/add", addPermission)
-	e.GET("/file/download", downloadFile)
+	e.GET("/thing/download", downloadThing)
 	e.POST("/thing/upload", upLoadThing)
+	e.POST("/thing/delete", deleteThing)
+	e.GET("/thing/get", getThings)
 	//e.POST("/userpermission/update", updatePermission)
 
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))))
@@ -138,9 +183,10 @@ func startRCServer() {
 }
 
 func main() {
+
 	initRCProfiling()
+	initLog()
 	initCasbinRCEnforce()
 	initORM()
-
 	startRCServer()
 }

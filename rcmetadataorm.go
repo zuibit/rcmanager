@@ -28,12 +28,12 @@ package main
 
 import (
 	_ "errors"
-	"fmt"
 	"runtime"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"
+	log "github.com/sirupsen/logrus"
 	//"github.com/go-xorm/xorm-redis-cache"
 )
 
@@ -41,24 +41,22 @@ type Property struct {
 	ClassName      string   `json:"class_name"`
 	Name           string   `json:"name"`            // name of things
 	Vendor         string   `json:"vendor"`          // Vendor of things
-	ReleaseTime    string   `json:"release_time"`    //TODO change to time format
+	ReleaseTime    string   `json:"release_time"`    // change to time format
 	ClassId        string   `json:"class_id"`        // reserved but not used
 	TargetPlatform string   `json:"target_platform"` // reserved but not used
 	Description    string   `json:"description"`     // reserved but not used
 	DependClass    []string `json:"dependclass"`
 }
 
-// TODO add version
 type Metadata struct {
-	ID          int64      `xorm:autoincr`
-	ClassID     string     `xorm:varchar(100) "unique"`
-	PackageName string     `xorm:"varchar(100) PK index 'packageName'" json:"package_name"`
+	Id          int64      `xorm:autoincr json:"-"`
+	ClassId     string     `xorm:"varchar(100) PK index unique"`
+	PackageName string     `xorm:"varchar(100)  index 'packageName'" json:"package_name"`
 	Properties  []Property `xorm:"Text json 'properties'" json:"metadata"`
-	FilePath    string     `xorm:varchar(100)`
-	Version     float32    `xorm:Float`
-	CreateAt    time.Time  `xorm:"created"`
-	UpdateAt    time.Time  `xorm:"updated"`
-	DeleteAt    time.Time  `xorm:"deleted"`
+	FilePath    string     `xorm:"varchar(100)" json:"uri"`
+	Verson      float32    `xorm:"Float"`
+	CreateAt    time.Time  `xorm:"created" json:"-"`
+	//UpdateAt    time.Time  `xorm:"updated" json:"-"`
 }
 
 type OrmMetadataAdapter struct {
@@ -70,7 +68,6 @@ type OrmMetadataAdapter struct {
 // finalizer is the destructor for Adapter.
 func metadatafinalizer(a *OrmMetadataAdapter) {
 	a.engine.Close()
-	fmt.Println("Metadata ORM close")
 }
 
 // NewAdapter is the constructor for Adapter.
@@ -107,6 +104,8 @@ func (a *OrmMetadataAdapter) open() {
 	var err error
 
 	if err = a.createDatabase(); err != nil {
+		rcLog.Panic("Could not create thing database")
+
 		panic(err)
 	}
 
@@ -114,9 +113,12 @@ func (a *OrmMetadataAdapter) open() {
 		engine, err = xorm.NewEngine(a.driverName, a.dataSourceName+"things")
 	}
 	if err != nil {
+		rcLog.WithFields(log.Fields{
+			"Driver ":      a.driverName,
+			"Data Source ": a.dataSourceName + "things",
+		}).Panic("Could not setup the ORM engine")
 		panic(err)
 	}
-	fmt.Println("ORM things engine create successful")
 
 	a.engine = engine
 	a.engine.ShowSQL(rcConfigure.OrmShowSQL)
@@ -132,23 +134,36 @@ func (a *OrmMetadataAdapter) open() {
 func (a *OrmMetadataAdapter) SyncTable() {
 	err := a.engine.Sync2(new(Metadata))
 	if err != nil {
+		rcLog.WithFields(log.Fields{
+			"Driver ":      a.driverName,
+			"Data Source ": a.dataSourceName,
+		}).Panic("Could not sync the table things")
+
 		panic(err)
 	}
-	fmt.Println("ORM sync thing table successful")
 }
 
 func (a *OrmMetadataAdapter) addthing(metadata Metadata) (int64, error) {
+
+	rcLog.WithFields(log.Fields{
+		"PackageName ": metadata.PackageName,
+		"ClassID ":     metadata.ClassId,
+	}).Info("Add thing in database")
+
 	has, err := a.engine.Get(&metadata)
 	if err != nil {
 		return -1, err
 	}
 	if has == true {
-		fmt.Println("Record already exist")
-		return -1, ErrNotExist
+		return -1, ErrAlreadyExist
 	}
 	id, err := a.engine.Insert(&metadata)
 	if err != nil {
-		fmt.Println("ORM Insert thing fail")
+		rcLog.WithFields(log.Fields{
+			"PackageName ": metadata.PackageName,
+			"ClassID ":     metadata.ClassId,
+		}).Error("Could not add thing in database")
+
 		return -1, err
 	}
 	return id, nil
@@ -156,16 +171,30 @@ func (a *OrmMetadataAdapter) addthing(metadata Metadata) (int64, error) {
 
 // The query rule shall be username + resouce，find more record
 func (a *OrmMetadataAdapter) findThings(metadatas *[]Metadata, metadata *Metadata) error {
-	err := a.engine.Find(metadatas, metadata)
-	fmt.Println("ORM find the result thing :", len(*metadatas))
-	return err
+
+	rcLog.WithFields(log.Fields{
+		"PackageName ": metadata.PackageName,
+		"ClassID ":     metadata.ClassId,
+	}).Info("Find thing in database")
+
+	return a.engine.Find(metadatas, metadata)
 }
 
-// The query rule shall be username + resouce, get one record
 func (a *OrmMetadataAdapter) getThing(metadata *Metadata) (bool, error) {
-	return a.engine.Get(*metadata)
+	rcLog.WithFields(log.Fields{
+		"PackageName ": metadata.PackageName,
+		"ClassID ":     metadata.ClassId,
+	}).Info("Get thing in database")
+
+	return a.engine.Get(metadata)
 }
 
-func (a *OrmPermissionAdapter) deleteThing(metadata Metadata) (int64, error) {
-	return a.engine.Delete(metadata)
+func (a *OrmMetadataAdapter) deleteThing(metadata *Metadata) (int64, error) {
+
+	rcLog.WithFields(log.Fields{
+		"PackageName ": metadata.PackageName,
+		"ClassID ":     metadata.ClassId,
+	}).Info("Delete thing in database")
+
+	return a.engine.Where("class_Id = ?", metadata.ClassId).Delete(metadata)
 }
