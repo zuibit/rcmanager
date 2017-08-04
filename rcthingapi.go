@@ -27,12 +27,10 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -40,7 +38,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//TODO seems that we don't need the filepath
 type ThingResponse struct {
 	Status   int        `json:"status"`
 	Message  string     `json:"message"`
@@ -56,18 +53,13 @@ func (res *ThingResponse) setResBody(status int, message string, property []Meta
 }
 
 func upLoadThing(c echo.Context) error {
-	//TODO code review to solve the potential performance risk
+	//TODO Limit the upload file size
 	//TODO store the dst file on cloud, not local
 	res := &ThingResponse{}
 	metadata := new(Metadata)
 
 	thing := c.FormValue("thing")
-	verson, err := strconv.ParseFloat(c.FormValue("verson"), 32)
 
-	if err != nil {
-		res.setResBody(400, "version shall be float such as 1.0 ", nil, ErrParamsType.Error())
-		return c.JSON(http.StatusOK, res)
-	}
 	if thing == "" {
 		res.setResBody(400, "please provide thing name", nil, ErrParamsType.Error())
 		return c.JSON(http.StatusOK, res)
@@ -119,9 +111,15 @@ func upLoadThing(c echo.Context) error {
 
 	if fileSuffix := path.Ext(file.Filename); strings.Contains(fileSuffix, "zip") || strings.Contains(fileSuffix, "tar") || strings.Contains(fileSuffix, ".gz") {
 		//TODO maybe some performance issue
-		metadata, err = handleUploadThing(dst.Name(), fileSuffix, thing, float32(verson))
+
+		metadata, err = handleUploadThing(dst.Name(), fileSuffix, thing)
 	}
+	dstName := dst.Name()
+	// if don't close the file ,could not remove the file properly
+	dst.Close()
 	if err != nil {
+		//os.Remove(dstName)
+		os.RemoveAll(path.Dir(dstName))
 		res.setResBody(500, "Server exception for upload file", nil, err.Error())
 	} else {
 		metadatas := make([]Metadata, 1)
@@ -153,7 +151,6 @@ func deleteThing(c echo.Context) error {
 		"Delete File on server": metadata.FilePath,
 	}).Info("Delete Server File")
 
-	fmt.Println("delete file path is :", metadata.FilePath)
 	//we don't need to check the io delete result
 	//just make sure database record is removed
 	os.RemoveAll(path.Dir(metadata.FilePath))
@@ -231,6 +228,14 @@ func downloadThing(c echo.Context) error {
 			return c.JSON(http.StatusOK, res)
 		}
 		//get the file path and return the file
+
+		_, err = os.Stat(metadata.FilePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				res.setResBody(500, "Things file does not exist", metadatas, ErrNotExist.Error())
+				return c.JSON(http.StatusOK, res)
+			}
+		}
 		return c.Attachment(metadata.FilePath, path.Base(metadata.FilePath))
 	} else {
 		res.setResBody(400, "Find Param is invalid, pls provide ClassID", metadatas, ErrParamsType.Error())

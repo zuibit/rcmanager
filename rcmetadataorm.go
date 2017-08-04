@@ -39,22 +39,24 @@ import (
 
 type Property struct {
 	ClassName      string   `json:"class_name"`
-	Name           string   `json:"name"`            // name of things
-	Vendor         string   `json:"vendor"`          // Vendor of things
+	Name           string   `json:"name"`   // name of things
+	Vendor         string   `json:"vendor"` // Vendor of things
+	Author         string   `json:"author"`
+	Version        string   `json:"version"`
 	ReleaseTime    string   `json:"release_time"`    // change to time format
 	ClassId        string   `json:"class_id"`        // reserved but not used
 	TargetPlatform string   `json:"target_platform"` // reserved but not used
-	Description    string   `json:"description"`     // reserved but not used
+	Description    string   `json:"description"`     // reserved ut not used
 	DependClass    []string `json:"dependclass"`
 }
 
 type Metadata struct {
-	Id          int64      `xorm:autoincr json:"-"`
+	//Id          int64      `xorm:"autoincr" json:"-"`
 	ClassId     string     `xorm:"varchar(100) PK index unique"`
 	PackageName string     `xorm:"varchar(100)  index 'packageName'" json:"package_name"`
 	Properties  []Property `xorm:"Text json 'properties'" json:"metadata"`
 	FilePath    string     `xorm:"varchar(100)" json:"uri"`
-	Verson      float32    `xorm:"Float"`
+	Version     string     `xorm:"varchar(100)"`
 	CreateAt    time.Time  `xorm:"created" json:"-"`
 	//UpdateAt    time.Time  `xorm:"updated" json:"-"`
 }
@@ -105,7 +107,6 @@ func (a *OrmMetadataAdapter) open() {
 
 	if err = a.createDatabase(); err != nil {
 		rcLog.Panic("Could not create thing database")
-
 		panic(err)
 	}
 
@@ -138,7 +139,6 @@ func (a *OrmMetadataAdapter) SyncTable() {
 			"Driver ":      a.driverName,
 			"Data Source ": a.dataSourceName,
 		}).Panic("Could not sync the table things")
-
 		panic(err)
 	}
 }

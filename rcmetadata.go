@@ -108,7 +108,7 @@ func (self *ThingsMetadata) getJsonFilePath(filename string) (string, error) {
 }
 
 //support .ZIP, .TAR or .tar.gz
-func handleUploadThing(filename string, ext string, outputfolder string, version float32) (*Metadata, error) {
+func handleUploadThing(filename string, ext string, outputfolder string) (*Metadata, error) {
 
 	rcLog.WithFields(log.Fields{
 		"Archive Package": filename,
@@ -137,6 +137,7 @@ func handleUploadThing(filename string, ext string, outputfolder string, version
 	default:
 		err = ErrFileTypeNotSupported
 	}
+
 	if nil != err {
 		rcLog.WithFields(log.Fields{
 			"Archive Package": filename,
@@ -159,7 +160,7 @@ func handleUploadThing(filename string, ext string, outputfolder string, version
 	//Each version thing only have one ClassId
 	metaData.ClassId = metaData.Properties[0].ClassId
 	metaData.FilePath = filename
-	metaData.Verson = version
+	metaData.Version = metaData.Properties[0].Version
 	_, err = ormMetadataAdapter.addthing(metaData)
 	os.RemoveAll(desFilePath)
 	/*
