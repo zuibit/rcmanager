@@ -53,7 +53,7 @@ var rcLog = log.New()
 func initLog() {
 	// Log as JSON instead of the default ASCII formatter.
 	rcLog.Formatter = &log.JSONFormatter{}
-
+	//TODO seperate the log file
 	if rcConfigure.LogFile != "" {
 		timestamp := time.Now().Format("2006-01-02-15-04-05-")
 
