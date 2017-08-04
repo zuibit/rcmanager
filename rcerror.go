@@ -35,6 +35,8 @@ var (
 	ErrParamsType = errors.New("Params type error")
 	// ErrNotExist record is not exist error
 	ErrNotExist = errors.New("Not exist error")
+	// ErrAlreadyExist record is not exist error
+	ErrAlreadyExist = errors.New("Already exist error")
 	// ErrCacheFailed cache failed error
 	ErrNeedDeletedCond = errors.New("Delete need at least one condition")
 	// ErrNotImplemented not implemented
