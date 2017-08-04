@@ -42,6 +42,8 @@ type RcConfigure struct {
 	ServerReadTimeout  int    `ini:"serverReadTimeout"`
 	ServerWriteTimeout int    `ini:"serverWriteTimeout"`
 	StaticFolder       string `ini:"StaticFolder"`
+	LogLevel           int    `ini:"logLevel"`
+	LogFile            string `ini:"logFile"`
 }
 
 var rcConfigure *RcConfigure
@@ -68,6 +70,8 @@ func initRCProfiling() {
 		ServerReadTimeout:  10,
 		ServerWriteTimeout: 10,
 		StaticFolder:       "static",
+		LogLevel:           1,
+		LogFile:            "",
 	}
 	/*
 		rcConfigure.Drivername = cfg.Section("").Key("drivername").String()
@@ -89,6 +93,8 @@ func initRCProfiling() {
 		fmt.Println("ServerReadTimeout :", rcConfigure.ServerReadTimeout)
 		fmt.Println("ServerWriteTimeout :", rcConfigure.ServerWriteTimeout)
 		fmt.Println("Static folder is :", rcConfigure.StaticFolder)
+		fmt.Println("Log Level is :", rcConfigure.LogLevel)
+		fmt.Println("Log File is :", rcConfigure.LogFile)
 
 	}
 }
