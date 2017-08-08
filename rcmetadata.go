@@ -163,17 +163,6 @@ func handleUploadThing(filename string, ext string, outputfolder string) (*Metad
 	metaData.Version = metaData.Properties[0].Version
 	_, err = ormMetadataAdapter.addthing(metaData)
 	os.RemoveAll(desFilePath)
-	/*
-		fmt.Println("Load data :", metaData)
-		fmt.Println("Package Name is ", metaData.PackageName)
-		fmt.Println("Class Name is ", metaData.Properties[0].ClassName)
-		fmt.Println("Class ID is ", metaData.Properties[0].ClassId)
-		fmt.Println("Description is ", metaData.Properties[0].Description)
-		fmt.Println("Name is ", metaData.Properties[0].Name)
-		fmt.Println("Release Time is ", metaData.Properties[0].ReleaseTime)
-		fmt.Println("Release Time is ", metaData.Properties[0].TargetPlatform)
-		fmt.Println("Vender is ", metaData.Properties[0].Vendor)
-		fmt.Println("DependClass is ", metaData.Properties[0].DependClass)
-	*/
+
 	return &metaData, err
 }

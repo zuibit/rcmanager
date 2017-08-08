@@ -76,7 +76,6 @@ func getPermission(c echo.Context) error {
 		}
 	} else {
 		res.setResBody(400, "Find Param is invalid, pls provide Ptype ,Username, Resource or Action", 0, ErrParamsType.Error(), nil)
-
 	}
 	return c.JSON(http.StatusOK, res)
 }
@@ -91,7 +90,7 @@ func deletePermission(c echo.Context) error {
 		res.setResBody(400, "Delete request Param error,  pls provide Username, Resource & Action", 0, err.Error(), nil)
 		return c.JSON(http.StatusOK, res)
 	}
-	fmt.Println("username: ", line.Username, "Resource: ", line.Resource, "Action: ", line.Action)
+
 	isinvalid := len(line.Username) == 0 || len(line.Resource) == 0 || len(line.Action) == 0
 	if isinvalid == false {
 		//TODO check return value
